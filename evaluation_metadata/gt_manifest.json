@@ -1,0 +1,97 @@
+{
+  "version": 1,
+  "frozen_at_utc": "2026-09-28T05:17:18.563390+00:00",
+  "corpus_size": 118287,
+  "dimension": 1024,
+  "K": 20,
+  "query_count_per_modality": 1000,
+  "corpus_split": "train",
+  "query_split": "val",
+  "query_sources": {
+    "image": {
+      "path": "data/queries/image_queries.npy",
+      "sha256": "057ad42598fa901d769b281e5af58d5b7177e998d76fe9305202ed8cada4095e",
+      "seed": 42,
+      "reconstructed_source_exact_match": true
+    },
+    "text": {
+      "path": "data/queries/text_queries.npy",
+      "sha256": "79bc10f06cb4dcdb86d4fb2502cd6ec0f6e250afd5eff7e4c1d44f6035c92125",
+      "seed": 43,
+      "reconstructed_source_exact_match": true
+    }
+  },
+  "corpus_source": {
+    "path": "data/embeddings/coco_imagebind.h5",
+    "sha256": "76464d328f2c88ea03d99ae1cb843424371afe3f3221893aa4641077454b2d1d"
+  },
+  "artifacts": {
+    "text_gt_scores.npy": {
+      "sha256": "fce7ec6b162fce689f1887bbeafb4db531ad67a730381ccaaadbe8dbb0730f76",
+      "bytes": 160128
+    },
+    "text_gt_ids.npy": {
+      "sha256": "e25936d68af9d23795fa6e83461218262e794c1fe94b04efdebcde5522d7f37f",
+      "bytes": 160128
+    },
+    "image_gt_quantized_scores.npy": {
+      "sha256": "e321a53eb4eb5b4b89374ad4ba500f1f709d03205070e6c14da0f1b3fa8d3a4e",
+      "bytes": 160128
+    },
+    "corpus_vectors.npy": {
+      "sha256": "fda25607d76f5091987e06847362d92346b9ec3bd8c1eec20a84f53528733767",
+      "bytes": 484503680
+    },
+    "query_ids.csv": {
+      "sha256": "4219afce461b28012a151cf3353332abdec2f18d32b2a08a0c522cbe95e656e2",
+      "bytes": 81465
+    },
+    "text_gt_quantized_scores.npy": {
+      "sha256": "71dc75c7741c5780e33997ae840e8ce51018a4c4816ea005736c24f3c830aa56",
+      "bytes": 160128
+    },
+    "image_queries.npy": {
+      "sha256": "40adf9e368c4c2e14b71a723fa7b1eb4db57d06fb64ae6cc650852869a84b56f",
+      "bytes": 4096128
+    },
+    "image_gt_scores.npy": {
+      "sha256": "8866e786164329f9964cbb7b91466932ee52236974b286c889221010cc807df3",
+      "bytes": 160128
+    },
+    "image_gt_ids.npy": {
+      "sha256": "4e51ee7120321dac918ca1f0ff0e33eac2570079fe51933100bc5979aec57665",
+      "bytes": 160128
+    },
+    "corpus_ids.csv": {
+      "sha256": "4927b3088e35e0a6263a28880b68a679977ab19721190b913b21171d355cde44",
+      "bytes": 2357558
+    },
+    "text_queries.npy": {
+      "sha256": "b8fc3f19dd54e9de4de8cc6fac637ffba1596f12bbe59924d9beb40fcbadfca2",
+      "bytes": 4096128
+    }
+  },
+  "normalized_vector_payload_sha256": {
+    "corpus": "c8a2e1bf2db589bf6eba659a23d2d362a096344288426352bbb13a65804b8eb4",
+    "image": "c8da129f3b4bc7ef4b20258bae1c8d98387e33d69fb50c7c3b83275d959b0b16",
+    "text": "5fb43f78bc12ed5754f7193f71f15cdbfb7b2af7473508f5a85dc6a9180a1e34"
+  },
+  "normalization": "protocol_v6.unit on every source float32 row exactly once: copy little-endian float32, float64 L2 norm, divide using the existing NumPy 1.26.4 implementation, store float32. Frozen arrays are normative; do not renormalize them.",
+  "score": "Existing B2 unit-vector cosine convention: np.einsum('ij,j->i', corpus, query, dtype=float64, optimize=False); no approximate search; all 118287 rows.",
+  "ranking": "np.rint(score * 1e8).astype(int64), descending; rid ascending breaks quantized-score ties. K=20. Same expression as B2 top().",
+  "score_files": "gt_scores are unquantized float64 scores for the selected rows; gt_quantized_scores are the normative ranking integers.",
+  "self_inclusion": "train and val COCO image-ID intersection is empty",
+  "scope": "unrestricted image corpus; image and text queries; no source/time restriction",
+  "compatibility": "B2 numerical rule retained. Existing ANNProof results are NOT relabeled as using this artifact; future comparison must explicitly consume it.",
+  "software": {
+    "python": "3.10.20",
+    "numpy": "1.26.4",
+    "h5py": "3.16.0"
+  },
+  "code_sha256": {
+    "src/protocol_v6.py": "5480b6b8abebefc45e0b3af3b5d936b9a54e9377dc844c6afd5e33d69e849e50",
+    "src/protocol_compact.py": "9420dc7f48fa4b3bcd852dd69bbd1c36bb1ff1c0c6d9d857003353d2fca99439",
+    "src/probe_budget.py": "4a1b139fcb1b9d0b30ea507082bcb2e25f1b39b2d88a15686af01cfb755b487a",
+    "experiments/run_probe_budget_screen.py": "366f0a9857787e276494a42ba34e515977e09ce668886fc294d90bfb2a5cb037"
+  }
+}

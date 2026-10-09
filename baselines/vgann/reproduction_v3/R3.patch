@@ -1,0 +1,10 @@
+--- previous
++++ R3
+@@ -1,5 +1,5 @@
+-"""TrustMR experiments: V-GANN R2 with original-neighbor fallback at guided dead ends."""
+-VARIANT='R2'
++"""TrustMR experiments: V-GANN R3 with deterministic restarts for underfull results."""
++VARIANT='R3'
+ import hashlib,heapq,struct,time
+ import numpy as np
+ import msgpack

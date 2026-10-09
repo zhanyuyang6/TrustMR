@@ -1,0 +1,36 @@
+--- upstream/common.h
++++ native/common.h
+@@ -25,11 +25,10 @@
+ using namespace std;
+ 
+ 
++static thread_local mt19937 hcnng_rng(20260928u);
+ int rand_int(const int & min, const int & max) {
+-	static thread_local mt19937* generator = nullptr;
+-	if (!generator) generator = new mt19937(clock() + std::hash<std::thread::id>()(this_thread::get_id()));
+-	uniform_int_distribution<int> distribution(min, max);
+-	return distribution(*generator);
++    uniform_int_distribution<int> distribution(min, max);
++    return distribution(hcnng_rng);
+ }
+ 
+ int rand_int_nosafe(int min, int max){
+@@ -104,7 +103,7 @@
+ 		weight = _weight;
+ 	}
+ 	bool operator<(const Edge& e) const {
+-		return weight < e.weight;
++		return std::tie(weight,v1,v2) < std::tie(e.weight,e.v1,e.v2);
+ 	}
+ 	~Edge() { }
+ };
+--- upstream/hcnng.cpp
++++ native/hcnng.cpp
+@@ -152,6 +152,7 @@
+ 	printf("creating clusters...\n");
+ 	#pragma omp parallel for
+ 	for(int i=0; i<num_cl; i++){
++        hcnng_rng.seed(20260928u + 104729u * i);
+ 		int * idx_points = new int[N];
+ 		for(int j=0; j<N; j++)
+ 			idx_points[j] = j;

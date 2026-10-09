@@ -1,0 +1,10 @@
+--- previous
++++ R2
+@@ -1,5 +1,5 @@
+-"""TrustMR experiments: V-GANN R1 with guarded result-set initialization."""
+-VARIANT='R1'
++"""TrustMR experiments: V-GANN R2 with original-neighbor fallback at guided dead ends."""
++VARIANT='R2'
+ import hashlib,heapq,struct,time
+ import numpy as np
+ import msgpack

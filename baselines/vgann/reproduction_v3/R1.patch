@@ -1,0 +1,153 @@
+--- previous
++++ R1
+@@ -1,16 +1,17 @@
+-"""TrustMR experiments: reference V-GANN reproduction for baseline validation."""
++"""TrustMR experiments: V-GANN R1 with guarded result-set initialization."""
++VARIANT='R1'
+ import hashlib,heapq,struct,time
+ import numpy as np
+ import msgpack
+ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+ 
+-U32=struct.Struct('<I'); U16=struct.Struct('<H'); MAGIC=b'VGANN002'
++U32=struct.Struct('<I'); U16=struct.Struct('<H'); MAGIC=b'VGANN003'
+ def sha(x):return hashlib.sha256(x).digest()
+ def parent(a,b):return sha(b'I'+a+b)
+ def leaf(rid,vector,tuples):return sha(b'L'+U32.pack(rid)+vector+U32.pack(len(tuples))+tuples)
+ def pack_tuple(t):return msgpack.packb(t,use_bin_type=True)
+ def unpack_tuple(b):return msgpack.unpackb(b,raw=False)
+-def initial(query_id,n):return int.from_bytes(sha(b'VGANN-screen-v1'+query_id.encode()),'big')%n
++def initial(query_id,n):return int.from_bytes(sha(b'VGANN-baseline-v1'+query_id.encode()),'big')%n
+ 
+ 
+ def guided_tuple(points,rid,neighbors):
+@@ -39,28 +40,55 @@
+     return best
+ 
+ 
+-def search(points,tuples,q,k,start):
++def restart_id(query_id,counter,n,visited):
++    rid=int.from_bytes(sha(b'VGANN-R3'+query_id.encode()+struct.pack('<Q',counter)),'big')%n
++    while rid in visited:rid=(rid+1)%n
++    return rid
++
++
++def search(points,tuples,q,k,start,query_id='',n=None):
++    n=len(points) if n is None else n
+     q=np.asarray(q,dtype=np.float64);distances={};candidate=[];visited={start};results={}
++    guided=0;fallback=0;maxqueue=1;restart_points=[];repair_points=[];repair_seconds=0.0
+     def distance(i):
+         if i not in distances:
+             delta=np.asarray(points[i],dtype=np.float64)-q
+             distances[i]=float(np.dot(delta,delta))
+         return distances[i]
+-    ds=distance(start);heapq.heappush(candidate,(ds,start));results[start]=ds
+-    current=start;maxqueue=1
+-    while candidate:
+-        for rid in subspace(tuples[current],q,points[current]):
++    def enqueue(ids,repair=False):
++        for rid in ids:
+             if rid not in visited:
+                 visited.add(rid);heapq.heappush(candidate,(distance(rid),rid))
+-        maxqueue=max(maxqueue,len(candidate))
+-        d,current=heapq.heappop(candidate)
+-        worst=max(results,key=lambda i:(results[i],i))
+-        if len(results)==k and d>results[worst]:break
++                if repair:repair_points.append(rid)
++    heapq.heappush(candidate,(distance(start),start));current=start
++    while candidate or (VARIANT=='R3' and len(results)<k and len(visited)<n):
++        if not candidate:
++            # Exhaust the current point's original neighbors before restarting.
++            t=time.perf_counter();ids=sorted({i for _,group in tuples[current] for i in group}-visited)
++            if ids:
++                fallback+=1;enqueue(ids,True)
++            else:
++                rid=restart_id(query_id,len(restart_points),n,visited)
++                restart_points.append(rid);enqueue([rid],True);current=rid
++            repair_seconds+=time.perf_counter()-t
++        ids=[i for i in subspace(tuples[current],q,points[current]) if i not in visited];guided+=1
++        if VARIANT in ('R2','R3') and not ids and len(results)<k:
++            # Fall back at a guided dead end while fewer than K results are available.
++            t=time.perf_counter();ids=sorted({i for _,group in tuples[current] for i in group}-visited)
++            fallback+=1;enqueue(ids,True);repair_seconds+=time.perf_counter()-t
++        else:enqueue(ids)
++        if not candidate:break
++        maxqueue=max(maxqueue,len(candidate));d,current=heapq.heappop(candidate)
++        if len(results)==k:
++            worst=max(results,key=lambda i:(results[i],i))
++            if d>results[worst]:break
+         results[current]=d
+         if len(results)>k:
+             worst=max(results,key=lambda i:(results[i],i));del results[worst]
+     result=sorted(results,key=lambda i:(results[i],i))
+-    return result,visited,{'ndc':len(distances),'candidate_queue_max':maxqueue,'probed_points':len(visited)}
++    return result,visited,{'ndc':len(distances),'candidate_queue_max':maxqueue,'probed_points':len(visited),
++        'guided_expansions':guided,'fallback_expansions':fallback,'restart_count':len(restart_points),
++        'restart_points':restart_points,'repair_points':repair_points,'repair_seconds':repair_seconds}
+ 
+ 
+ class Index:
+@@ -97,18 +125,19 @@
+         return entries,{'raw_vo_seconds':rawseconds,'collapse_seconds':time.perf_counter()-t,'raw_vo_entries':rawcount,'hash_merges':merges,'full_entries':sum(not isinstance(x[2],bytes) for x in entries),'hash_entries':sum(isinstance(x[2],bytes) for x in entries),'vo_entries':len(entries)}
+ 
+     def response(self,q,k,query_id):
+-        start=initial(query_id,self.n);t=time.perf_counter();result,visited,stats=search(self.points,self.tuples,q,k,start);stats['search_seconds']=time.perf_counter()-t
++        start=initial(query_id,self.n);t=time.perf_counter();result,visited,stats=search(self.points,self.tuples,q,k,start,query_id,self.n);stats['search_seconds']=time.perf_counter()-t
+         entries,ps=self.proof(visited);stats.update(ps)
+-        response={'n':self.n,'d':self.d,'k':k,'start':start,'query_id':query_id,'entries':entries,'result':result,'signature':self.signature}
++        response={'n':self.n,'d':self.d,'k':k,'start':start,'query_id':query_id,'entries':entries,'result':result,'signature':self.signature,'variant':VARIANT,'restarts':stats['restart_points']}
+         t=time.perf_counter();payload,parts=encode(response);stats['serialize_seconds']=time.perf_counter()-t
+         return response,payload,stats,parts
+ 
+ 
+ def encode(response):
+-    chunks=[];parts={k:0 for k in ['probed_point_vectors','guided_tuples','record_ids','merkle_hashes','structural_framing','initial_point_metadata','result_ids','result_vectors','root_signature']}
++    chunks=[];parts={k:0 for k in ['probed_point_vectors','guided_tuples','record_ids','merkle_hashes','structural_framing','initial_point_metadata','result_ids','result_vectors','root_signature','restart_metadata']}
+     def put(data,key):chunks.append(data);parts[key]+=len(data)
+     qid=response['query_id'].encode()
+     put(MAGIC+struct.pack('<IIIIH',response['n'],response['d'],response['k'],response['start'],len(qid))+qid,'initial_point_metadata')
++    put(U32.pack(int(response['variant'][1:]))+U32.pack(len(response['restarts']))+b''.join(U32.pack(i) for i in response['restarts']),'restart_metadata')
+     put(response['signature'],'root_signature');put(U32.pack(len(response['entries'])),'structural_framing')
+     for level,rid,data in response['entries']:
+         if isinstance(data,bytes):
+@@ -129,7 +158,9 @@
+         if n<0 or offset+n>len(payload):raise ValueError('truncated response')
+         v=payload[offset:offset+n];offset+=n;return v
+     if take(8)!=MAGIC:raise ValueError('wire version')
+-    n,d,k,start,qlen=struct.unpack('<IIIIH',take(18));qid=take(qlen).decode();signature=take(64)
++    n,d,k,start,qlen=struct.unpack('<IIIIH',take(18));qid=take(qlen).decode();variant='R'+str(U32.unpack(take(4))[0]);rcount=U32.unpack(take(4))[0]
++    if rcount>n:raise ValueError('restart count')
++    restarts=[U32.unpack(take(4))[0] for _ in range(rcount)];signature=take(64)
+     if not 0<n<=100000000 or not 0<d<=100000 or not 0<k<=n:raise ValueError('wire dimensions')
+     count=U32.unpack(take(4))[0]
+     if count>2*(1<<(n-1).bit_length()):raise ValueError('entry count')
+@@ -147,7 +178,7 @@
+     if count>n:raise ValueError('result count')
+     result=[U32.unpack(take(4))[0] for _ in range(count)]
+     if offset!=len(payload):raise ValueError('trailing wire bytes')
+-    return {'n':n,'d':d,'k':k,'start':start,'query_id':qid,'signature':signature,'entries':entries,'result':result}
++    return {'n':n,'d':d,'k':k,'start':start,'query_id':qid,'signature':signature,'entries':entries,'result':result,'variant':variant,'restarts':restarts}
+ 
+ 
+ def root_hash(entries,n,d):
+@@ -174,6 +205,7 @@
+ 
+ def verify(payload,q,k,query_id,n,d,public,trusted_root):
+     times={};total=time.perf_counter();t=time.perf_counter();r=decode(payload);times['deserialize_seconds']=time.perf_counter()-t
++    if r['variant']!=VARIANT:raise ValueError('variant mismatch')
+     if (r['n'],r['d'],r['k'],r['query_id'],r['start'])!=(n,d,k,query_id,initial(query_id,n)):raise ValueError('request/start binding')
+     t=time.perf_counter();root=root_hash(r['entries'],n,d);times['compute_root_seconds']=time.perf_counter()-t
+     t=time.perf_counter()
+@@ -185,8 +217,11 @@
+         if not isinstance(data,bytes):
+             points[rid]=np.frombuffer(data[0],dtype='<f4');tuples[rid]=unpack_tuple(data[1])
+     times['parse_seconds']=time.perf_counter()-t
+-    t=time.perf_counter();replayed,V,stats=search(points,tuples,q,k,r['start']);times['replay_seconds']=time.perf_counter()-t
++    t=time.perf_counter();replayed,V,stats=search(points,tuples,q,k,r['start'],query_id,n);times['replay_seconds']=time.perf_counter()-t
+     t=time.perf_counter()
++    if stats['restart_points']!=r['restarts']:raise ValueError('restart transcript mismatch')
++    times['repair_replay_seconds']=stats['repair_seconds']
++    times['guided_replay_seconds']=times['replay_seconds']-stats['repair_seconds']
+     if replayed!=r['result']:raise ValueError('result replay mismatch')
+     if V!=set(points):raise ValueError('declared probed set differs from replay')
+     times['result_comparison_seconds']=time.perf_counter()-t;times['total_verification_seconds']=time.perf_counter()-total

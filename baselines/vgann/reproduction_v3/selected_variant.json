@@ -1,0 +1,45 @@
+{
+  "variant": "V-GANN-R2",
+  "label": "V-GANN-R (our repaired reproduction)",
+  "reason": "First repair in R1/R2/R3 ladder passing all 40-query gates at all four scales; no recall used.",
+  "repair_description": "R1 empty R and guarded max; R2 all original neighbors only at guided dead-end while R<K.",
+  "honest_pass_rate": 1.0,
+  "history": [
+    {
+      "variant": "R1",
+      "N": 1000,
+      "pass_count": 32,
+      "total": 40
+    },
+    {
+      "variant": "R1",
+      "N": 5000,
+      "pass_count": 35,
+      "total": 40
+    },
+    {
+      "variant": "R2",
+      "N": 1000,
+      "pass_count": 40,
+      "total": 40
+    },
+    {
+      "variant": "R2",
+      "N": 5000,
+      "pass_count": 40,
+      "total": 40
+    },
+    {
+      "variant": "R2",
+      "N": 20000,
+      "pass_count": 40,
+      "total": 40
+    },
+    {
+      "variant": "R2",
+      "N": 118287,
+      "pass_count": 40,
+      "total": 40
+    }
+  ]
+}

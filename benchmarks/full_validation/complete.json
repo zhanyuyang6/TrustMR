@@ -1,0 +1,10 @@
+{
+  "complete": true,
+  "all_responses_valid": true,
+  "methods": [
+    "V-GANN",
+    "VSQ",
+    "TrustMR"
+  ],
+  "queries_per_modality": 5000
+}

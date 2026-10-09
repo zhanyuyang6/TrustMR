@@ -1,0 +1,5 @@
+numpy==1.26.4
+h5py==3.16.0
+msgpack==1.2.2
+cryptography==50.0.1
+threadpoolctl==3.7.0
